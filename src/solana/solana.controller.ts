@@ -1,21 +1,69 @@
 import { SolanaService } from './solana.service';
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
-import { isValidAddress, publicToAddress } from 'ethereumjs-util';
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 
 @Controller('/')
 export class SolanaController {
-  constructor(private readonly l1IngestionService: SolanaService) {}
+  constructor(private readonly solanaService: SolanaService) {}
 
-  @Get('generateAddress')
-  generateAddress() {
+  @Post('generateAddress')
+  async generateAddress(@Body() param) {
+    const address_num = param['address_num'];
+    const addressList = await this.solanaService.createSolAddress(address_num);
     return {
       code: 200,
+      msg: 'batch address genereate success',
+      addressList: addressList,
     };
   }
+
+
   @Post('signTransaction')
-  getL2ToL1Relation() {
+  async signTransaction(@Body() param) {
+    const from = param['from'];
+    const amount = param['amount'];
+    const nonceAccount = param['nonceAccount'];
+    const to = param['to'];
+    const mintAddress = param['mintAddress'];
+    const nonce = param['nonce'];
+    const decimal = param['decimal'];
+    const privateKey = param['privateKey'];
+    const params = {
+      from: from,
+      nonceAccount: nonceAccount,
+      amount: amount,
+      to: to,
+      nonce: nonce,
+      decimal: decimal,
+      privateKey: privateKey,
+      mintAddress: mintAddress,
+    };
+    const txHex = await this.solanaService.signSolTransaction(params);
     return {
       code: 200,
+      msg: 'sign transaction success',
+      raw_tx: txHex,
+    };
+  }
+
+  @Post('prepareAccount')
+  async prepareAccount(@Body() param) {
+    const authorAddress = param['authorAddress'];
+    const from = param['from'];
+    const recentBlockhash = param['recentBlockhash'];
+    const minBalanceForRentExemption = param['minBalanceForRentExemption'];
+    const privs = param['privs'];
+    const params = {
+      authorAddress: authorAddress,
+      from: from,
+      recentBlockhash: recentBlockhash,
+      minBalanceForRentExemption: minBalanceForRentExemption,
+      privs: privs,
+    };
+    const txHex = await this.solanaService.prepareAccount(params);
+    return {
+      code: 200,
+      msg: 'prepare account success',
+      raw_tx: txHex,
     };
   }
 }

@@ -2,7 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Addresses } from 'src/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, getConnection, getManager, Repository } from 'typeorm';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import Web3 from 'web3';
 import { Gauge } from 'prom-client';
@@ -17,20 +18,22 @@ import {
   SystemProgram,
   Transaction,
 } from '@solana/web3.js';
+import { timestamp } from 'rxjs';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const bs58 = require('bs58');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { derivePath, getPublicKey } = require('ed25519-hd-key');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const BigNumber = require('bignumber.js');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const bip39 = require('bip39');
+const { v4: uuidv4 } = require('uuid');
+
 
 @Injectable()
 export class SolanaService {
   private readonly logger = new Logger(SolanaService.name);
-  entityManager: EntityManager;
-  web3: Web3;
-  ctcContract: any;
-  sccContract: any;
-  crossDomainMessengerContract: any;
-  bvmEigenDataLayrChain: any;
   constructor(
     private configService: ConfigService,
     @InjectRepository(Addresses)
@@ -38,20 +41,77 @@ export class SolanaService {
     private readonly httpService: HttpService,
   ) {}
 
-  async createSolAddress(seedHex: string, addressIndex: string) {
-    const { key } = derivePath("m/44'/501'/0'/" + addressIndex + "'", seedHex);
-    const publicKey = getPublicKey(new Uint8Array(key), false).toString('hex');
-    const buffer = Buffer.from(
-      getPublicKey(new Uint8Array(key), false).toString('hex'),
-      'hex',
-    );
-    const address = bs58.encode(buffer);
-    const hdWallet = {
-      privateKey: key.toString('hex') + publicKey,
-      publicKey,
-      address,
-    };
-    return JSON.stringify(hdWallet);
+  async createSolAddress(addressNum: number) {
+    const mnemonic = bip39.generateMnemonic();
+    const seedHex = bip39.mnemonicToSeedSync(mnemonic);
+    const AddressList = [];
+    const AddressListInsertData: any[] = [];
+    for (let addressIndex = 0; addressIndex <= addressNum; addressIndex++) {
+      const { key } = derivePath(
+        "m/44'/501'/0'/" + addressIndex + "'",
+        seedHex,
+      );
+      const publicKey = getPublicKey(new Uint8Array(key), false).toString(
+        'hex',
+      );
+      const buffer = Buffer.from(
+        getPublicKey(new Uint8Array(key), false).toString('hex'),
+        'hex',
+      );
+      const address = bs58.encode(buffer);
+      this.logger.log('create address success', address);
+      AddressList.push({
+        private_key: key.toString('hex') + publicKey,
+        publicKey,
+        address,
+      });
+      let addressType = 0;
+      if (addressIndex == 1) {
+        addressType = 1;
+      }
+      if (addressIndex == 2) {
+        addressType = 2;
+      }
+      AddressListInsertData.push({
+        guid: uuidv4(),
+        user_uid: uuidv4(),
+        address: address,
+        address_type: addressType,
+        private_key: key.toString('hex') + publicKey,
+        public_key: publicKey,
+        timestamp: Math.floor(Date.now() / 1000),
+      });
+    }
+    const dataSource = getConnection();
+    const queryRunner = dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await queryRunner.startTransaction();
+      await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(Addresses)
+        .values(AddressListInsertData)
+        .execute()
+        .catch((e) => {
+          console.log({
+            type: 'ERROR',
+            time: new Date().getTime(),
+            msg: `insert batch address failed ${e?.message}`,
+          });
+          throw Error(e.message);
+        });
+      this.logger.log('commit tx success');
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      this.logger.log('execute rollback tx');
+      await queryRunner.rollbackTransaction();
+    } finally {
+      this.logger.log('execute tx release');
+      await queryRunner.release();
+    }
+    return AddressList;
   }
 
   async signSolTransaction(params) {
