@@ -10,12 +10,33 @@ export class SolanaController {
     const address_num = param['address_num'];
     const addressList = await this.solanaService.createSolAddress(address_num);
     return {
-      code: 200,
+      code: 2000,
       msg: 'batch address genereate success',
       addressList: addressList,
     };
   }
 
+  @Post('verifyAddress')
+  async verifyAddress(@Body() param) {
+    const address = param['address'];
+    const params = {
+      address: address,
+    };
+    const isAddress = await this.solanaService.verifySolAddress(params);
+    if (isAddress) {
+      return {
+        code: 2000,
+        msg: 'verify address success',
+        success: true,
+      };
+    } else {
+      return {
+        code: 4000,
+        msg: 'verify address fail',
+        success: false,
+      };
+    }
+  }
 
   @Post('signTransaction')
   async signTransaction(@Body() param) {
@@ -39,7 +60,7 @@ export class SolanaController {
     };
     const txHex = await this.solanaService.signSolTransaction(params);
     return {
-      code: 200,
+      code: 2000,
       msg: 'sign transaction success',
       raw_tx: txHex,
     };
@@ -61,7 +82,7 @@ export class SolanaController {
     };
     const txHex = await this.solanaService.prepareAccount(params);
     return {
-      code: 200,
+      code: 2000,
       msg: 'prepare account success',
       raw_tx: txHex,
     };

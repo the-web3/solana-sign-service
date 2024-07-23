@@ -13,7 +13,7 @@ export class TasksService {
     private schedulerRegistry: SchedulerRegistry,
   ) {}
   private readonly logger = new Logger(TasksService.name);
-  @Interval(200)
+  @Interval(10000)
   async generateAddress() {
     this.logger.log('generateAddressgenerateAddress');
   }

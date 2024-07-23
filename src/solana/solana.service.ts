@@ -28,6 +28,7 @@ const { derivePath, getPublicKey } = require('ed25519-hd-key');
 const BigNumber = require('bignumber.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bip39 = require('bip39');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { v4: uuidv4 } = require('uuid');
 
 
